@@ -15,12 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-type TagCommit struct {
-	Short string
-	Id string
-}
-
-func RemoteTags(url string) ([]TagCommit, error) {
+func RemoteTags(url string) ([]db.TagCommit, error) {
 	r := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
 		Name: "origin",
 		URLs: []string{url},
@@ -32,14 +27,14 @@ func RemoteTags(url string) ([]TagCommit, error) {
 	if err != nil {
 		return nil, err
 	}
-	results := make([]TagCommit, 0)
+	results := make([]db.TagCommit, 0)
 	
 	for _, ref := range refs {
 		name := ref.Name()
 		if name.IsTag() {
-			tc := TagCommit{
+			tc := db.TagCommit{
 				Short: name.Short(),
-				Id: name.String(),
+				Id: ref.Hash().String(),
 			}
 			results = append(results, tc)
 		}
@@ -90,16 +85,25 @@ func main() {
 			} else if cmd.Args["add"] == "true" {
 				url := cmd.Args["url"]
 				if url != "" && strings.HasPrefix(url, "http") {
+					
+					repo_id, err := db.AddRepoByURL(url)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+
 					tags, err := RemoteTags(url)
 					if err != nil {
 						fmt.Println("could not connect to remote to retrieve tags", err)
 						return
 					}
 					for _, tag := range tags {
-						fmt.Println("tag", tag)
+						err = db.AddTag(tag, repo_id)
+						if err != nil {
+							fmt.Println(err)
+						}
+						fmt.Println("adding tag", tag.Short)
 					}
-
-					db.AddRepoByURL(url)
 
 
 					fmt.Println("added repo by url: ", url)

@@ -13,6 +13,13 @@ type DB struct {
 
 	psListRepos *sql.Stmt
 	psAddRepoByUrl *sql.Stmt
+	psAddTag *sql.Stmt
+}
+
+
+type TagCommit struct {
+	Short string
+	Id string
 }
 
 func ConnectDB(addr string) (result *DB, err error) {
@@ -40,11 +47,24 @@ func ConnectDB(addr string) (result *DB, err error) {
 		return nil, errors.Join(errors.New("failed to init db"), err)
 	}
 
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS tag_info (
+		id INTEGER PRIMARY KEY,
+		short_name TEXT,
+		commit_hash TEXT,
+		repo_info_id INTEGER,
+		FOREIGN KEY(repo_info_id) REFERENCES repo_info(id),
+		UNIQUE(repo_info_id, commit_hash)
+	)`)
+	if err != nil {
+		return nil, errors.Join(errors.New("failed to init db"), err)
+	}
+
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS commit_scan_job (
 		id INTEGER PRIMARY KEY,
-		commit_id TEXT,
-		owning_repo_id INTEGER,
-		FOREIGN KEY(owning_repo_id) REFERENCES repo_info(id)
+		tag_info_id INTEGER,
+		repo_info_id INTEGER,
+		FOREIGN KEY(repo_info_id) REFERENCES repo_info(id),
+		FOREIGN KEY(tag_info_id) REFERENCES tag_info(id)
 	)`)
 	if err != nil {
 		return nil, errors.Join(errors.New("failed to init db"), err)
@@ -62,6 +82,12 @@ func ConnectDB(addr string) (result *DB, err error) {
 		return nil, errors.Join(errors.New("failed to init db"), err)
 	}
 
+	result.psAddTag, err = db.Prepare(`INSERT INTO tag_info (short_name, commit_hash, repo_info_id) VALUES (?, ?, ?)`)
+	if err != nil {
+		return nil, errors.Join(errors.New("failed to init db"), err)
+	}
+
+
 	result.db = db
 
 	return result, nil
@@ -74,6 +100,11 @@ func (db *DB) Close() error {
 	}
 
 	err = db.psListRepos.Close()
+	if err != nil {
+		_errs = append(_errs, err)
+	}
+
+	err = db.psAddTag.Close()
 	if err != nil {
 		_errs = append(_errs, err)
 	}
@@ -111,8 +142,21 @@ func (db *DB) ListRepos(count int, offset int) (results []RepoInfo, err error) {
 	return results, nil
 }
 
-func (db *DB) AddRepoByURL(url string) error {
-	_, err := db.psAddRepoByUrl.Exec(url)
+func (db *DB) AddRepoByURL(url string) (repo_id int, err error) {
+	res, err := db.psAddRepoByUrl.Exec(url)
+	if err != nil {
+		return 0, errors.Join(errors.New("failed to add repo by url"), err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, errors.Join(errors.New("failed to get id of added repo"), err)
+	}
+	return int(id), nil
+}
+
+func (db *DB) AddTag (tag TagCommit, repo_id int) error {
+	_, err := db.psAddTag.Exec(tag.Short, tag.Id, repo_id)
 	if err != nil {
 		return errors.Join(errors.New("failed to add repo by url"), err)
 	}
