@@ -48,7 +48,7 @@ func RemoteTags(url string) ([]TagCommit, error) {
 }
 
 func main() {
-	db,err := db.ConnectDB("file:./local.db")
+	db,err := db.ConnectDB("file:./depshit.db")
 	if err != nil {
 		panic(err)
 	}
