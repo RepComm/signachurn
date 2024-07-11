@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>depshit</title>
+  <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+  <link rel="stylesheet" href="./index.css">
+  </link>
+</head>
+
+<body>
+  <div class="header">
+    <span class="title">depshit</span>
+    <span>analyze deps, rank API stability</span>
+  </div>
+
+  <div class="analyse-bg">
+
+    <form class="analyse" hx-post="/htmx/analyse" hx-target="#analysis">
+
+      <span>Enter git URL</span>
+      <input type="url" name="url" placeholder="https://github.com/repcomm/depshit"></input>
+      <button type="submit">
+        Analyse Your Project
+      </button>
+    </form>
+
+  </div>
+  
+  <div id="analysis">
+  </div>
+</body>
+
+</html>

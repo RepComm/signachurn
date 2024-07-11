@@ -5,6 +5,7 @@ import (
 	"depshit/db"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -109,6 +110,40 @@ func main() {
 		}
 	})
 	
+	s := http.Server{
+		Addr: "0.0.0.0:8080",
+	}
+
+	http.HandleFunc("/htmx/", func(w http.ResponseWriter, r *http.Request) {
+		
+		result := ""
+
+		
+
+		p := r.URL.Path
+		switch p {
+		case "/htmx/analyse":
+			url := r.PostFormValue("url")
+			result = fmt.Sprintf(`<div id="analysis">
+			Results %s
+			</div>`, url)
+		}
+		w.Write([]byte(result))
+	})
+
+	http.Handle("/", http.FileServer(http.Dir("./web")))
+
+	ServerCertPem := "./server.cert.pem"
+	ServerKeyPem := "./server.key.pem"
+	err = s.ListenAndServeTLS(ServerCertPem, ServerKeyPem)
+	if err != nil {
+		fmt.Println("failed SSL, possibly no cert/key, using http instead", err)
+		err = s.ListenAndServe()
+		if err != nil {
+			fmt.Println("failed HTTPS and HTTP, panic", err)
+		}
+	}
+
 	for !shouldClose {
 		time.Sleep(time.Millisecond*50)
 	}
