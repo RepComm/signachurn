@@ -1,29 +1,47 @@
-# depshit - API stability metrics
-depshit analyzes libraries to rank them on API stability
+# signachurn
+if it ain't broke, don't rename it
 
-## the problem
-Inspired by watching [Linus Torvalds on why desktop Linux sucks - gentooman](https://www.youtube.com/watch?v=Pzl1B7nB9Kc)
+## problem
+naming things is hard, naming things twice is harder
 
-When deciding what dependency we want to use, we use a metric: commit frequency.
+at first glance, renaming after realising a change in scope seems like a good idea<br/>
+but when you are someone's dependency, renaming causes many more issues.
 
-Repo commit frequency is similar to dependability.
 
-On it's own, commit frequency is really just commit churn. You can inflate trust by commiting lots of changes.
+## solution
+signa-churn identifies projects with significant signature changes over commit/release history
 
-Frequent commits can incur frequent API changes.
-A packager's nightmare.
+dependents are encouraged to pick dependencies that do not have frequent renamings
+dependencies are encouraged to pick better names, and adapt internals of existing code instead of reworking API entirely
 
-Example of breaking changes:
-```diff
-+ //GetPerson by email changed to make more sense, see GetPersonByEmail
-- function GetPerson ( email: string ): Person
-+ function GetPerson ( id   : number ): Person
-+ ...
-+ function GetPersonByEmail( email: string ): Person
-```
-While this makes sense to the dev, it breaks any down-stream dependants, triggering upgrades and rebuilds.
+## how
+signachurn scans project trees, extracting all signatures and storing in a database
 
-## a solution
-Give developers the metric of API stability, not just maintainer engagement
+each tag (release) is compared to render information about changes to signatures over history
 
-Bonus points: provide suggestions for dependency swapping / code changes required to migrate
+when a project renames a function, it will add a point to the project's local score
+
+globally, dependent projects will multiply this score by their usage
+
+the more API surface changes, the higher the score
+and like golf, higher is worse
+
+## under-the-hood
+signachurn is a tool built using golang made of several components
+
+- a database (pocketbase)
+- a web frontend (built with preact)
+- a scalable job system
+- a job scan plugin system
+
+the database stores calculated signature statistics for repositories
+
+the web front end renders and queries the database for developers to see
+
+the job system enables resumable parallel calculation of signature statistics
+
+the job scan plugin system enables future kinds of language scanning
+
+## goals
+- enable developers to see global API changes
+- encourage less churn by selecting stable API surfaces over instable ones

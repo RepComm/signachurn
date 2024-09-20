@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "scan/proto";
+
+enum ScanJobType {
+  SCAN_JOB_UNSPECIFIED = 0;
+  SCAN_JOB_FILE = 1;
+  SCAN_JOB_DIRECTORY = 2;
+  SCAN_JOB_GIT = 3;
+}
+
+message ScanJob {
+  ScanJobType Type = 1;
+  ScanJobFile File = 2;
+}
+
+message ScanJobFile {
+  string FileName = 1;
+  string FileContent = 2;
+}
+
+message Signature {
+  string Name = 1;
+  string AsString = 2;
+}
+
+message ScanResult {
+  string error = 1;
+  repeated Signature Signatures = 2;
+}
