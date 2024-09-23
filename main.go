@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"log"
+	"signachurn/db"
 	"signachurn/scan"
 	"signachurn/scan/cpp"
 	"signachurn/scan/proto"
+	"time"
 )
 
 type Scanners struct {
@@ -38,23 +40,33 @@ func (s *Scanners) Process(job *proto.ScanJob) (*proto.ScanResult, error) {
 }
 
 func main() {
-	scanners := NewScanners()
-	scanners.all = append(scanners.all, &cpp.ScannerCpp{})
+	log.Println("starting DB")
+	db := db.NewDB()
+	db.Start(func() {
 
-	job := &proto.ScanJob{
-		Type: proto.ScanJobType_SCAN_JOB_GIT,
-		Git: &proto.ScanJobGit{
-			RemoteURL: "https://github.com/glfw/glfw",
-		},
-	}
+		log.Println("init scanners")
 
-	scanRes, err := scanners.Process(job)
-	if err != nil {
-		panic(err)
-	}
-	// for _, sig := range scanRes.GetSignatures() {
-	// 	log.Println("Signature", sig.Name, sig.AsString)
-	// }
-	log.Println("Found", len(scanRes.GetSignatures()), "signatures")
+		scanners := NewScanners()
+		scanners.all = append(scanners.all, &cpp.ScannerCpp{})
 
+		log.Println("adding job")
+		job := &proto.ScanJob{
+			Type: proto.ScanJobType_SCAN_JOB_GIT,
+			Git: &proto.ScanJobGit{
+				RemoteURL: "https://github.com/glfw/glfw",
+			},
+		}
+
+		log.Println("process job")
+		scanRes, err := scanners.Process(job)
+		if err != nil {
+			panic(err)
+		}
+		log.Println("Found", len(scanRes.GetSignatures()), "signatures")
+		log.Println("appending")
+		db.AddSignatures("head", scanRes.GetSignatures()...)
+	})
+	defer db.Stop()
+
+	time.Sleep(time.Second * 100)
 }
