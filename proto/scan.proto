@@ -14,6 +14,11 @@ enum ScanJobType {
 message ScanJob {
   ScanJobType Type = 1;
   ScanJobFile File = 2;
+  ScanJobGit Git = 3;
+}
+
+message ScanJobGit {
+  string RemoteURL = 1;
 }
 
 message ScanJobFile {
