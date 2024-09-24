@@ -4,7 +4,6 @@ go 1.22.1
 
 require (
 	github.com/go-clang/clang-v14 v1.0.0
-	github.com/tursodatabase/go-libsql v0.0.0-20240916111504-922dfa87e1e6
 	google.golang.org/protobuf v1.34.2
 )
 
@@ -82,9 +81,4 @@ require (
 	modernc.org/token v1.1.0 // indirect
 )
 
-require (
-	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
-	github.com/libsql/sqlite-antlr4-parser v0.0.0-20240327125255-dbf53b6cbf06 // indirect
-	github.com/pocketbase/pocketbase v0.22.21
-	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678 // indirect
-)
+require github.com/pocketbase/pocketbase v0.22.21
