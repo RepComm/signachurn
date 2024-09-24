@@ -7,6 +7,7 @@ import (
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/forms"
 	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/models/schema"
 	"github.com/pocketbase/pocketbase/tools/types"
@@ -47,21 +48,22 @@ func (db *DB) Start(Init func()) error {
 	return nil
 }
 
-func (db *DB) EnsureCollection(c *models.Collection) (*models.Collection, error) {
+func (db *DB) EnsureCollectionV(c *models.Collection) (*models.Collection, error) {
 	result, err := db.pb.Dao().FindCollectionByNameOrId(c.Name)
 	if result != nil && err == nil {
-		return result, err
+		return result, nil
 	}
-	err = db.pb.Dao().SaveCollection(c)
+	f := forms.NewCollectionUpsert(db.pb, c)
+	err = f.Submit()
 	if err != nil {
 		return nil, err
 	}
-	return db.pb.Dao().FindCollectionByNameOrId(c.Name)
+	return c, nil
 }
 
 func (db *DB) EnsureCollections() error {
 
-	repos, err := db.EnsureCollection(&models.Collection{
+	repos, err := db.EnsureCollectionV(&models.Collection{
 		Name:       "repos",
 		Type:       models.CollectionTypeBase,
 		ListRule:   types.Pointer(""),
@@ -71,9 +73,10 @@ func (db *DB) EnsureCollections() error {
 		DeleteRule: nil,
 		Schema: schema.NewSchema(
 			&schema.SchemaField{
-				Name:     "url",
-				Type:     schema.FieldTypeUrl,
-				Required: true,
+				Name:        "url",
+				Type:        schema.FieldTypeUrl,
+				Required:    true,
+				Presentable: true,
 			},
 		),
 	})
@@ -82,7 +85,7 @@ func (db *DB) EnsureCollections() error {
 	}
 	db.Repos = repos
 
-	sigs, err := db.EnsureCollection(&models.Collection{
+	sigs, err := db.EnsureCollectionV(&models.Collection{
 		Name:       "signatures",
 		Type:       models.CollectionTypeBase,
 		ListRule:   types.Pointer("@request.auth.id != ''"),
@@ -111,7 +114,7 @@ func (db *DB) EnsureCollections() error {
 	}
 	db.Signatures = sigs
 
-	tags, err := db.EnsureCollection(&models.Collection{
+	tags, err := db.EnsureCollectionV(&models.Collection{
 		Name:       "tags",
 		Type:       models.CollectionTypeBase,
 		ListRule:   types.Pointer(""),
@@ -119,31 +122,28 @@ func (db *DB) EnsureCollections() error {
 		CreateRule: nil, //only admins
 		UpdateRule: nil,
 		DeleteRule: nil,
-		Schema: schema.NewSchema(
-			&schema.SchemaField{
-				Name:     "name",
-				Type:     schema.FieldTypeText,
-				Required: true,
+		Schema: schema.NewSchema(&schema.SchemaField{
+			Name:        "name",
+			Type:        schema.FieldTypeText,
+			Required:    true,
+			Presentable: true,
+		}, &schema.SchemaField{
+			Name:     "repo",
+			Type:     schema.FieldTypeRelation,
+			Required: true,
+			Options: schema.RelationOptions{
+				MaxSelect:    types.Pointer(1),
+				CollectionId: repos.Id,
 			},
-			&schema.SchemaField{
-				Name:     "repo",
-				Type:     schema.FieldTypeRelation,
-				Required: true,
-				Options: schema.RelationOptions{
-					MaxSelect:    types.Pointer(1),
-					CollectionId: repos.Id,
-				},
+		}, &schema.SchemaField{
+			Name:     "signatures",
+			Type:     schema.FieldTypeRelation,
+			Required: false,
+			Options: schema.RelationOptions{
+				MaxSelect:    nil,
+				CollectionId: sigs.Id,
 			},
-			&schema.SchemaField{
-				Name:     "signatures",
-				Type:     schema.FieldTypeRelation,
-				Required: false,
-				Options: schema.RelationOptions{
-					MaxSelect:    nil,
-					CollectionId: sigs.Id,
-				},
-			},
-		),
+		}),
 		Indexes: types.JsonArray[string]{
 			"CREATE UNIQUE INDEX idx_tag ON signatures (name, repo)",
 		},
@@ -156,12 +156,31 @@ func (db *DB) EnsureCollections() error {
 	return nil
 }
 
+func (db *DB) EnsureRepo(RepoURL string) (string, error) {
+	rec, err := db.pb.Dao().FindFirstRecordByData(
+		db.Repos.Id,
+		"url", RepoURL,
+	)
+	if rec != nil && err == nil {
+		return rec.Id, nil
+	}
+	rec = models.NewRecord(db.Repos)
+	rec.Set("url", RepoURL)
+	f := forms.NewRecordUpsert(db.pb, rec)
+	err = f.Submit()
+	if err != nil {
+		return "", err
+	}
+	return rec.Id, nil
+}
+
 func (db *DB) AddTag(RepoId string, TagName string, SignatureIds ...string) error {
 	rec := models.NewRecord(db.Tags)
 	rec.Set("repo", RepoId)
 	rec.Set("name", TagName)
 	rec.Set("signatures", SignatureIds)
-	return db.pb.Dao().SaveRecord(rec)
+	f := forms.NewRecordUpsert(db.pb, rec)
+	return f.Submit()
 }
 
 func (db *DB) AddSignatures(Signatures ...*proto.Signature) (error, []string) {
@@ -171,11 +190,13 @@ func (db *DB) AddSignatures(Signatures ...*proto.Signature) (error, []string) {
 		rec := models.NewRecord(db.Signatures)
 		rec.Set("name", Signature.Name)
 		rec.Set("typestring", Signature.AsString)
-		err := db.pb.Dao().SaveRecord(rec)
-		results = append(results, rec.Id)
+		f := forms.NewRecordUpsert(db.pb, rec)
+		err := f.Submit()
 		if err != nil {
 			errs = append(errs, err)
+			continue
 		}
+		results = append(results, rec.Id)
 	}
 	return errors.Join(errs...), results
 }

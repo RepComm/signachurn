@@ -82,17 +82,22 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		log.Println("Found", len(scanRes.GetSignatures()), "signatures")
-		log.Println("appending")
-		err, sigIds := db.AddSignatures(scanRes.GetSignatures()...)
+		sigs := scanRes.GetSignatures()
+		log.Println("Found", len(sigs), "signatures")
+		repoId, err := db.EnsureRepo(job.Git.RemoteURL)
+		if err != nil {
+			panic(err)
+		}
+		err, sigIds := db.AddSignatures(sigs...)
 		if err != nil {
 			// panic(err)
 		}
 		err = db.AddTag(
-			job.Git.RemoteURL,
+			repoId,
 			"head",
 			sigIds...,
 		)
+		log.Println("Tag Add err", repoId, err)
 	})
 	defer db.Stop()
 
