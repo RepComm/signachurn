@@ -23,7 +23,7 @@ func NewScanners() *Scanners {
 	return result
 }
 
-func (s *Scanners) Process(job *proto.ScanJob) (*proto.ScanResult, error) {
+func (s *Scanners) Process(job *proto.ScanJob) ([]*proto.ScanResult, error) {
 	for _, sc := range s.all {
 		if sc.Accepts(job) {
 			res, err := sc.Scan(job)
@@ -78,26 +78,29 @@ func main() {
 		}
 
 		log.Println("process job")
-		scanRes, err := scanners.Process(job)
+		results, err := scanners.Process(job)
 		if err != nil {
 			panic(err)
 		}
-		sigs := scanRes.GetSignatures()
-		log.Println("Found", len(sigs), "signatures")
-		repoId, err := db.EnsureRepo(job.Git.RemoteURL)
+		_, err = db.EnsureRepo(job.Git.RemoteURL)
 		if err != nil {
 			panic(err)
 		}
-		err, sigIds := db.AddSignatures(sigs...)
-		if err != nil {
-			// panic(err)
+		for _, result := range results {
+			sigs := result.GetSignatures()
+			tagName := result.TagName
+			log.Println("Tag:", tagName, "-> found", len(sigs), "signatures")
+
+			// err, sigIds := db.AddSignatures(sigs...)
+			// if err != nil {
+			// 	// panic(err)
+			// }
+			// err = db.AddTag(
+			// 	repoId,
+			// 	tagName,
+			// 	sigIds...,
+			// )
 		}
-		err = db.AddTag(
-			repoId,
-			"head",
-			sigIds...,
-		)
-		log.Println("Tag Add err", repoId, err)
 	})
 	defer db.Stop()
 

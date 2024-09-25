@@ -9,6 +9,7 @@ import (
 	"signachurn/scan/proto"
 	"signachurn/utils/files"
 	"signachurn/utils/git"
+	"strings"
 
 	"github.com/go-clang/clang-v14/clang"
 )
@@ -22,7 +23,7 @@ func (s *ScannerCpp) Accepts(cfg *proto.ScanJob) bool {
 	}
 	return true
 }
-func (s *ScannerCpp) Scan(cfg *proto.ScanJob) (*proto.ScanResult, error) {
+func (s *ScannerCpp) Scan(cfg *proto.ScanJob) ([]*proto.ScanResult, error) {
 	//NoValidContentError
 	if cfg.Type != proto.ScanJobType_SCAN_JOB_GIT {
 		return nil, &scan.UnacceptableJobError{
@@ -43,28 +44,45 @@ func (s *ScannerCpp) Scan(cfg *proto.ScanJob) (*proto.ScanResult, error) {
 		".h",
 		".hpp",
 	}
-	fpaths := files.FindFileExts(DirPath, true, exts)
-	if len(fpaths) < 1 {
-		return nil, &scan.NoValidContentError{
-			Err: fmt.Errorf("couldnt find files with extensions: %s", exts),
+
+	tagNames, err := git.ListTags(DirPath)
+	results := []*proto.ScanResult{}
+	for _, tagName := range tagNames {
+		tagName = strings.TrimSpace(tagName)
+		if len(tagName) < 1 {
+			continue
+		}
+		err := git.Checkout(DirPath, tagName)
+		if err != nil {
+			log.Println("checkout issue, skipping", err)
+			continue
+		}
+
+		fpaths := files.FindFileExts(DirPath, true, exts)
+		if len(fpaths) < 1 {
+			return nil, &scan.NoValidContentError{
+				Err: fmt.Errorf("couldnt find files with extensions: %s", exts),
+			}
+		}
+
+		log.Printf("Found %d headers\n", len(fpaths))
+
+		result := &proto.ScanResult{
+			TagName:    tagName,
+			Signatures: []*proto.Signature{},
+		}
+		results = append(results, result)
+
+		c := clang.NewIndex(0, 0)
+		defer c.Dispose()
+
+		for _, FilePath := range fpaths {
+			sigs := FindSigsInFile(FilePath, c)
+			result.Signatures = append(result.Signatures, sigs...)
 		}
 	}
 
-	log.Printf("Found %d headers\n", len(fpaths))
-
-	result := &proto.ScanResult{
-		Signatures: []*proto.Signature{},
-	}
-
-	c := clang.NewIndex(0, 0)
-	defer c.Dispose()
-
-	for _, FilePath := range fpaths {
-		sigs := FindSigsInFile(FilePath, c)
-		result.Signatures = append(result.Signatures, sigs...)
-	}
-
-	return result, nil
+	return results, nil
 }
 
 func FindSigsInFile(FilePath string, c clang.Index) []*proto.Signature {

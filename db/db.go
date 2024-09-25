@@ -5,6 +5,7 @@ import (
 	"log"
 	"signachurn/scan/proto"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/forms"
@@ -187,11 +188,28 @@ func (db *DB) AddSignatures(Signatures ...*proto.Signature) (error, []string) {
 	errs := []error{}
 	results := []string{}
 	for _, Signature := range Signatures {
+		//search for existing signature first
+		recs, err := db.pb.Dao().FindRecordsByFilter(
+			db.Signatures.Id,
+			"name={:name} && typestring={:typestring}",
+			"",
+			1,
+			0,
+			dbx.Params{
+				"name":       Signature.Name,
+				"typestring": Signature.AsString,
+			},
+		)
+		if err != nil && len(recs) > 0 {
+			results = append(results, recs[0].Id)
+			continue
+		}
+		//didn't find existing, create
 		rec := models.NewRecord(db.Signatures)
 		rec.Set("name", Signature.Name)
 		rec.Set("typestring", Signature.AsString)
 		f := forms.NewRecordUpsert(db.pb, rec)
-		err := f.Submit()
+		err = f.Submit()
 		if err != nil {
 			errs = append(errs, err)
 			continue

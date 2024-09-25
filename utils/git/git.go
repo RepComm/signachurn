@@ -9,17 +9,19 @@ import (
 	"strings"
 )
 
-func ListTags() ([]string, error) {
+func ListTags(DirName string) ([]string, error) {
 	c := exec.Command(
 		"git",
 		"--no-pager",
 		"tag",
 		"-l",
 	)
+	c.Dir = DirName
 	o, err := c.Output()
 	if err != nil {
 		return nil, errors.Join(errors.New("couldnt list git tags"), err)
 	}
+
 	return strings.Split(string(o), "\n"), nil
 }
 
@@ -34,9 +36,10 @@ func CloneRemote(url string, DirPath string) error {
 	return nil
 }
 
-func Checkout(tag string) error {
-	log.Println("git: checkout", tag)
+func Checkout(DirPath string, tag string) error {
 	c := exec.Command("git", "checkout", tag)
+	c.Dir = DirPath
+	log.Println(c.String())
 	err := c.Run()
 	if err != nil {
 		return errors.Join(errors.New("couldnt checkout tag"), err)

@@ -33,5 +33,6 @@ message Signature {
 
 message ScanResult {
   string error = 1;
-  repeated Signature Signatures = 2;
+  string TagName = 2;
+  repeated Signature Signatures = 3;
 }

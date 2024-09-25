@@ -30,7 +30,7 @@ func (e *UnacceptableJobError) Error() string {
 
 type Scanner interface {
 	Accepts(cfg *proto.ScanJob) bool
-	Scan(cfg *proto.ScanJob) (*proto.ScanResult, error)
+	Scan(cfg *proto.ScanJob) ([]*proto.ScanResult, error)
 }
 
 const CLONES_DIR string = "./clones"
