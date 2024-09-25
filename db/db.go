@@ -200,8 +200,9 @@ func (db *DB) AddSignatures(Signatures ...*proto.Signature) (error, []string) {
 				"typestring": Signature.AsString,
 			},
 		)
-		if err != nil && len(recs) > 0 {
+		if err == nil && len(recs) > 0 {
 			results = append(results, recs[0].Id)
+			log.Println("Found existing sig", recs[0].Id)
 			continue
 		}
 		//didn't find existing, create

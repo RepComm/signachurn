@@ -82,7 +82,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		_, err = db.EnsureRepo(job.Git.RemoteURL)
+		repoId, err := db.EnsureRepo(job.Git.RemoteURL)
 		if err != nil {
 			panic(err)
 		}
@@ -91,15 +91,15 @@ func main() {
 			tagName := result.TagName
 			log.Println("Tag:", tagName, "-> found", len(sigs), "signatures")
 
-			// err, sigIds := db.AddSignatures(sigs...)
-			// if err != nil {
-			// 	// panic(err)
-			// }
-			// err = db.AddTag(
-			// 	repoId,
-			// 	tagName,
-			// 	sigIds...,
-			// )
+			err, sigIds := db.AddSignatures(sigs...)
+			if err != nil {
+				// panic(err)
+			}
+			err = db.AddTag(
+				repoId,
+				tagName,
+				sigIds...,
+			)
 		}
 	})
 	defer db.Stop()
